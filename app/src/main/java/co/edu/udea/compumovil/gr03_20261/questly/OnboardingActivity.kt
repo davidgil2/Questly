@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,9 +35,10 @@ class OnboardingActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuestlyTheme {
-                OnboardingFlow(onFinished = { name ->
+                OnboardingFlow(onFinished = { name, characterClass ->
                     val intent = Intent(this, HabitTrackerActivity::class.java).apply {
                         putExtra("USER_NAME", name)
+                        putExtra("USER_CLASS", characterClass)
                     }
                     startActivity(intent)
                     finish()
@@ -45,13 +48,16 @@ class OnboardingActivity : ComponentActivity() {
     }
 }
 
+data class CharacterOption(val name: String, val icon: ImageVector, val description: String, val color: Color)
+
 @Composable
-fun OnboardingFlow(onFinished: (String) -> Unit) {
+fun OnboardingFlow(onFinished: (String, String) -> Unit) {
     var step by remember { mutableStateOf(1) }
     var wakeTime by remember { mutableStateOf("05:00") }
     var sleepTime by remember { mutableStateOf("22:00") }
     var selectedSex by remember { mutableStateOf("") }
     var userName by remember { mutableStateOf("") }
+    var selectedClass by remember { mutableStateOf<CharacterOption?>(null) }
 
     val backgroundColor = Color(0xFFF3D9C9)
 
@@ -61,7 +67,7 @@ fun OnboardingFlow(onFinished: (String) -> Unit) {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             LeafDecoration(Modifier.align(Alignment.TopEnd).padding(top = 20.dp))
-            if (step == 3) {
+            if (step >= 3) {
                 LeafDecoration(Modifier.align(Alignment.BottomStart).padding(bottom = 100.dp), rotated = true)
             }
 
@@ -87,9 +93,14 @@ fun OnboardingFlow(onFinished: (String) -> Unit) {
                         name = userName,
                         onNameChange = { userName = it }
                     )
+                    4 -> ClassSelectionScreen(
+                        selectedClass = selectedClass,
+                        onClassSelected = { selectedClass = it }
+                    )
                 }
             }
 
+            // Next Button
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -97,7 +108,14 @@ fun OnboardingFlow(onFinished: (String) -> Unit) {
                     .size(80.dp)
                     .background(Color(0xFF333333), CircleShape)
                     .clickable {
-                        if (step < 3) step++ else onFinished(userName.ifBlank { "Dennis" })
+                        if (step < 4) {
+                            if (step == 3 && userName.isBlank()) return@clickable
+                            step++
+                        } else {
+                            if (selectedClass != null) {
+                                onFinished(userName, selectedClass!!.name)
+                            }
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -236,6 +254,50 @@ fun NameSetupScreen(name: String, onNameChange: (String) -> Unit) {
             unfocusedIndicatorColor = Color.Transparent
         )
     )
+}
+
+@Composable
+fun ClassSelectionScreen(selectedClass: CharacterOption?, onClassSelected: (CharacterOption) -> Unit) {
+    val options = listOf(
+        CharacterOption("Warrior", Icons.Default.Shield, "High strength and durability. Focuses on physical habits.", Color(0xFFEF9A9A)),
+        CharacterOption("Mage", Icons.Default.AutoFixHigh, "Master of wisdom. Focuses on study and focus habits.", Color(0xFFCE93D8)),
+        CharacterOption("Scout", Icons.Default.Explore, "Fast and agile. Focuses on hydration and movement.", Color(0xFF81D4FA))
+    )
+
+    Text(
+        text = "Choose your Class",
+        fontSize = 32.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color(0xFF333333)
+    )
+    
+    Spacer(modifier = Modifier.height(30.dp))
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(options) { option ->
+            val isSelected = selectedClass?.name == option.name
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onClassSelected(option) }
+                    .border(2.dp, if (isSelected) Color.Black else Color.Transparent, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = option.color.copy(alpha = if (isSelected) 1f else 0.4f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(option.icon, null, modifier = Modifier.size(40.dp), tint = Color.Black)
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(option.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text(option.description, fontSize = 14.sp, color = Color.Black.copy(alpha = 0.7f))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

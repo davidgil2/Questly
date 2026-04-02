@@ -43,6 +43,16 @@
             android:exported="false"
             android:theme="@style/Theme.Questly" />
 
+        <activity
+            android:name=".DailyEventActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Questly" />
+
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Questly" />
+
     </application>
 
 </manifest>

@@ -34,16 +34,29 @@ class HabitTrackerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val userName = intent.getStringExtra("USER_NAME") ?: "John Doe"
+        val userClass = intent.getStringExtra("USER_CLASS") ?: "Warrior"
         setContent {
             QuestlyTheme {
                 HabitTrackerScreen(
                     userName = userName,
+                    userClass = userClass,
                     onNavigateToCreate = {
                         val intent = Intent(this, CreateActivityActivity::class.java)
                         startActivity(intent)
                     },
                     onNavigateToShop = {
                         val intent = Intent(this, ShopActivity::class.java)
+                        startActivity(intent)
+                    },
+                    onNavigateToEvent = {
+                        val intent = Intent(this, DailyEventActivity::class.java)
+                        startActivity(intent)
+                    },
+                    onNavigateToProfile = {
+                        val intent = Intent(this, ProfileActivity::class.java).apply {
+                            putExtra("USER_NAME", userName)
+                            putExtra("USER_CLASS", userClass)
+                        }
                         startActivity(intent)
                     }
                 )
@@ -53,9 +66,16 @@ class HabitTrackerActivity : ComponentActivity() {
 }
 
 @Composable
-fun HabitTrackerScreen(userName: String, onNavigateToCreate: () -> Unit, onNavigateToShop: () -> Unit) {
+fun HabitTrackerScreen(
+    userName: String, 
+    userClass: String, 
+    onNavigateToCreate: () -> Unit, 
+    onNavigateToShop: () -> Unit, 
+    onNavigateToEvent: () -> Unit,
+    onNavigateToProfile: () -> Unit
+) {
     val backgroundColor = Color(0xFFE8F5E9)
-    var points by remember { mutableIntStateOf(150) } // Initial points
+    var points by remember { mutableIntStateOf(150) }
     
     val habits = remember { 
         mutableStateListOf(
@@ -68,14 +88,28 @@ fun HabitTrackerScreen(userName: String, onNavigateToCreate: () -> Unit, onNavig
         modifier = Modifier.fillMaxSize(),
         containerColor = backgroundColor,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToShop,
-                containerColor = Color(0xFFFFD54F),
-                contentColor = Color.Black,
-                shape = CircleShape,
-                modifier = Modifier.border(2.dp, Color.Black, CircleShape)
-            ) {
-                Icon(Icons.Default.ShoppingCart, contentDescription = "Shop")
+            Column(horizontalAlignment = Alignment.End) {
+                FloatingActionButton(
+                    onClick = onNavigateToEvent,
+                    containerColor = Color(0xFF1B5E20),
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp)).size(64.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "Daily Event", modifier = Modifier.size(32.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                FloatingActionButton(
+                    onClick = onNavigateToShop,
+                    containerColor = Color(0xFFFFD54F),
+                    contentColor = Color.Black,
+                    shape = CircleShape,
+                    modifier = Modifier.border(2.dp, Color.Black, CircleShape)
+                ) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = "Shop")
+                }
             }
         }
     ) { innerPadding ->
@@ -108,7 +142,9 @@ fun HabitTrackerScreen(userName: String, onNavigateToCreate: () -> Unit, onNavig
                     Surface(
                         color = Color(0xFFFFD54F),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.border(1.dp, Color.Black, RoundedCornerShape(12.dp))
+                        modifier = Modifier
+                            .border(1.dp, Color.Black, RoundedCornerShape(12.dp))
+                            .clickable { onNavigateToProfile() }
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Stars, null, modifier = Modifier.size(16.dp), tint = Color.Black)
@@ -120,7 +156,32 @@ fun HabitTrackerScreen(userName: String, onNavigateToCreate: () -> Unit, onNavig
             }
             
             Spacer(Modifier.height(24.dp))
-            Text("Bienvenido, $userName", fontSize = 24.sp, fontWeight = FontWeight.Medium)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToProfile() }
+                    .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = when(userClass) {
+                        "Warrior" -> Icons.Default.Shield
+                        "Mage" -> Icons.Default.AutoFixHigh
+                        else -> Icons.Default.Explore
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = Color(0xFF1B5E20)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Bienvenido, $userName", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("Clase: $userClass | Ver Perfil", fontSize = 14.sp, color = Color.Gray)
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
+            }
             
             Spacer(Modifier.height(24.dp))
             
