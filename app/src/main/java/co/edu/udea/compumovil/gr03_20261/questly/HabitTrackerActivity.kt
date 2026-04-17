@@ -1,10 +1,13 @@
 package co.edu.udea.compumovil.gr03_20261.questly
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -24,10 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class HabitTrackerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,15 +41,16 @@ class HabitTrackerActivity : ComponentActivity() {
         enableEdgeToEdge()
         val userName = intent.getStringExtra("USER_NAME") ?: "John Doe"
         val userClass = intent.getStringExtra("USER_CLASS") ?: "Warrior"
+        val wakeTime = intent.getStringExtra("WAKE_TIME") ?: "05:00"
+        val sleepTime = intent.getStringExtra("SLEEP_TIME") ?: "22:00"
+        
         setContent {
             QuestlyTheme {
                 HabitTrackerScreen(
                     userName = userName,
                     userClass = userClass,
-                    onNavigateToCreate = {
-                        val intent = Intent(this, CreateActivityActivity::class.java)
-                        startActivity(intent)
-                    },
+                    wakeTime = wakeTime,
+                    sleepTime = sleepTime,
                     onNavigateToShop = {
                         val intent = Intent(this, ShopActivity::class.java)
                         startActivity(intent)
@@ -65,23 +72,74 @@ class HabitTrackerActivity : ComponentActivity() {
     }
 }
 
+fun sortHabits(habits: MutableList<Habit>) {
+    val sdf24 = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val sdf12 = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    
+    habits.sortBy { habit ->
+        try {
+            val timeStr = habit.time.uppercase()
+            if (timeStr.contains("AM") || timeStr.contains("PM")) {
+                sdf12.parse(timeStr)?.time ?: 0L
+            } else {
+                sdf24.parse(timeStr)?.time ?: 0L
+            }
+        } catch (e: Exception) {
+            0L
+        }
+    }
+}
+
 @Composable
 fun HabitTrackerScreen(
     userName: String, 
-    userClass: String, 
-    onNavigateToCreate: () -> Unit, 
+    userClass: String,
+    wakeTime: String,
+    sleepTime: String,
     onNavigateToShop: () -> Unit, 
     onNavigateToEvent: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
+    val context = LocalContext.current
     val backgroundColor = Color(0xFFE8F5E9)
     var points by remember { mutableIntStateOf(150) }
     
     val habits = remember { 
         mutableStateListOf(
-            Habit(1, "Buenos Días", "09:00 AM", Icons.Default.WbSunny, Color(0xFFFFF176), listOf("Tiende la cama", "Bebe un vaso de agua")),
-            Habit(2, "Buenas Noches", "10:00 PM", Icons.Default.NightsStay, Color(0xFF90CAF9), listOf("Leer 10 páginas", "Planear mañana"))
-        )
+            Habit(1, "Buenos Días", wakeTime, Icons.Default.WbSunny, Color(0xFFFFF176), listOf("Tiende la cama", "Bebe un vaso de agua")),
+            Habit(2, "Buenas Noches", sleepTime, Icons.Default.NightsStay, Color(0xFF90CAF9), listOf("Leer 10 páginas", "Planear mañana"))
+        ).also { sortHabits(it) }
+    }
+
+    val createActivityLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val title = data?.getStringExtra("HABIT_TITLE") ?: ""
+            val time = data?.getStringExtra("HABIT_TIME") ?: ""
+            val colorInt = data?.getIntExtra("HABIT_COLOR", Color.Gray.value.toInt()) ?: Color.Gray.value.toInt()
+            val iconName = data?.getStringExtra("HABIT_ICON_NAME") ?: "Add"
+            val quests = data?.getStringArrayListExtra("HABIT_QUESTS") ?: arrayListOf<String>()
+
+            val icon = when (iconName) {
+                "FitnessCenter" -> Icons.Default.FitnessCenter
+                "Book" -> Icons.Default.Book
+                "WaterDrop" -> Icons.Default.WaterDrop
+                "Restaurant" -> Icons.Default.Restaurant
+                else -> Icons.Default.Add
+            }
+
+            val newHabit = Habit(
+                title = title,
+                time = time,
+                icon = icon,
+                color = Color(colorInt.toLong()),
+                quests = quests
+            )
+            habits.add(newHabit)
+            sortHabits(habits)
+        }
     }
 
     Scaffold(
@@ -131,7 +189,10 @@ fun HabitTrackerScreen(
                 
                 Column(horizontalAlignment = Alignment.End) {
                     Button(
-                        onClick = onNavigateToCreate,
+                        onClick = {
+                            val intent = Intent(context, CreateActivityActivity::class.java)
+                            createActivityLauncher.launch(intent)
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE082)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.border(2.dp, Color.Black, RoundedCornerShape(12.dp))
@@ -207,7 +268,10 @@ fun HabitTrackerScreen(
                 
                 item {
                     Button(
-                        onClick = onNavigateToCreate,
+                        onClick = {
+                            val intent = Intent(context, CreateActivityActivity::class.java)
+                            createActivityLauncher.launch(intent)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(80.dp)

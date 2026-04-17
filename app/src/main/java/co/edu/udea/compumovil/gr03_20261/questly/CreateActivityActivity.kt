@@ -1,5 +1,7 @@
 package co.edu.udea.compumovil.gr03_20261.questly
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,17 +10,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
@@ -33,14 +43,16 @@ class CreateActivityActivity : ComponentActivity() {
                 var selectedTitle by remember { mutableStateOf("") }
                 var selectedColor by remember { mutableStateOf(Color.Gray) }
                 var selectedIcon by remember { mutableStateOf(Icons.Default.Add) }
+                var selectedIconName by remember { mutableStateOf("Add") }
 
                 if (!showDetail) {
                     CreateActivityListScreen(
                         onBack = { finish() },
-                        onSelectActivity = { title, color, icon ->
+                        onSelectActivity = { title, color, icon, iconName ->
                             selectedTitle = title
                             selectedColor = color
                             selectedIcon = icon
+                            selectedIconName = iconName
                             showDetail = true
                         }
                     )
@@ -50,9 +62,16 @@ class CreateActivityActivity : ComponentActivity() {
                         color = selectedColor,
                         icon = selectedIcon,
                         onBack = { showDetail = false },
-                        onSave = { 
-                            // In a real app, save to DB. For now, just go back.
-                            finish() 
+                        onSave = { habit ->
+                            val resultIntent = Intent().apply {
+                                putExtra("HABIT_TITLE", habit.title)
+                                putExtra("HABIT_TIME", habit.time)
+                                putExtra("HABIT_COLOR", habit.color.toArgb())
+                                putExtra("HABIT_ICON_NAME", selectedIconName)
+                                putStringArrayListExtra("HABIT_QUESTS", ArrayList(habit.quests))
+                            }
+                            setResult(Activity.RESULT_OK, resultIntent)
+                            finish()
                         }
                     )
                 }
@@ -62,10 +81,16 @@ class CreateActivityActivity : ComponentActivity() {
 }
 
 @Composable
-fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Color, ImageVector) -> Unit) {
+fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Color, ImageVector, String) -> Unit) {
     val backgroundColor = Color(0xFFE8F5E9)
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = backgroundColor
     ) { innerPadding ->
         Column(
@@ -100,8 +125,11 @@ fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Colo
                     value = "",
                     onValueChange = {},
                     placeholder = { Text("Search activity...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
                 )
             }
             
@@ -110,11 +138,11 @@ fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Colo
             
             Spacer(Modifier.height(12.dp))
             
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { CreateHabitRow("Gym", "Exercise", Color(0xFFAED581), Icons.Default.FitnessCenter) { onSelectActivity("Gym", Color(0xFFCE93D8), Icons.Default.FitnessCenter) } }
-                item { CreateHabitRow("Study", "Homework", Color(0xFF81C784), Icons.Default.Book) { onSelectActivity("Study", Color(0xFF81C784), Icons.Default.Book) } }
-                item { CreateHabitRow("Hydrate!", "Water", Color(0xFF81D4FA), Icons.Default.WaterDrop) { onSelectActivity("Hydrate!", Color(0xFF81D4FA), Icons.Default.WaterDrop) } }
-                item { CreateHabitRow("Breakfast", "Meal 1", Color(0xFFFFF176), Icons.Default.Restaurant) { onSelectActivity("Breakfast", Color(0xFFFFF176), Icons.Default.Restaurant) } }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                item { CreateHabitRow("Gym", "Exercise", Color(0xFFCE93D8), Icons.Default.FitnessCenter) { onSelectActivity("Gym", Color(0xFFCE93D8), Icons.Default.FitnessCenter, "FitnessCenter") } }
+                item { CreateHabitRow("Study", "Homework", Color(0xFF81C784), Icons.Default.Book) { onSelectActivity("Study", Color(0xFF81C784), Icons.Default.Book, "Book") } }
+                item { CreateHabitRow("Hydrate!", "Water", Color(0xFF81D4FA), Icons.Default.WaterDrop) { onSelectActivity("Hydrate!", Color(0xFF81D4FA), Icons.Default.WaterDrop, "WaterDrop") } }
+                item { CreateHabitRow("Breakfast", "Meal 1", Color(0xFFFFF176), Icons.Default.Restaurant) { onSelectActivity("Breakfast", Color(0xFFFFF176), Icons.Default.Restaurant, "Restaurant") } }
             }
         }
     }
@@ -126,17 +154,21 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
     var questText by remember { mutableStateOf("") }
     val quests = remember { mutableStateListOf<String>() }
     var time by remember { mutableStateOf("07:00 AM") }
+    val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = backgroundColor
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp)
+                .verticalScroll(scrollState)
         ) {
+            Spacer(Modifier.height(20.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,8 +221,12 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
                         value = questText,
                         onValueChange = { questText = it },
                         placeholder = { Text("Nueva sub-misión...") },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Done
+                        )
                     )
                     IconButton(onClick = { if (questText.isNotBlank()) { quests.add(questText); questText = "" } }) {
                         Icon(Icons.Default.AddCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
@@ -205,10 +241,11 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
                 value = time,
                 onValueChange = { time = it },
                 modifier = Modifier.fillMaxWidth().border(1.dp, Color.Black, RoundedCornerShape(12.dp)),
-                colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
+                colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
             )
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(40.dp))
             
             Button(
                 onClick = { onSave(Habit(title = title, time = time, icon = icon, color = color, quests = quests.toList())) },
@@ -218,6 +255,8 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
             ) {
                 Text("Save Activity", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
+            
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
