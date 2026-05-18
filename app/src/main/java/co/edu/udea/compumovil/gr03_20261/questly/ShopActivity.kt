@@ -1,6 +1,7 @@
 package co.edu.udea.compumovil.gr03_20261.questly
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,7 +34,8 @@ data class ShopItem(
     val cost: Int,
     val icon: ImageVector,
     val category: String,
-    val color: Color
+    val color: Color,
+    val description: String = ""
 )
 
 class ShopActivity : ComponentActivity() {
@@ -49,15 +53,15 @@ class ShopActivity : ComponentActivity() {
 @Composable
 fun ShopScreen(onBack: () -> Unit) {
     val backgroundColor = Color(0xFFE8F5E9)
-    val userPoints = remember { mutableIntStateOf(150) } // Example points
+    val context = LocalContext.current
 
     val items = listOf(
-        ShopItem(1, "The Scholar", 100, Icons.Default.AutoStories, "Title", Color(0xFFAED581)),
-        ShopItem(2, "Night Owl", 150, Icons.Default.Bedtime, "Title", Color(0xFF90CAF9)),
-        ShopItem(3, "Warrior", 500, Icons.Default.Shield, "Character", Color(0xFFEF9A9A)),
-        ShopItem(4, "Speedy", 200, Icons.Default.DirectionsRun, "Effect", Color(0xFFFFF176)),
-        ShopItem(5, "Golden Icon", 300, Icons.Default.Stars, "Icon", Color(0xFFFFD54F)),
-        ShopItem(6, "Wizard", 750, Icons.Default.AutoFixHigh, "Character", Color(0xFFCE93D8))
+        ShopItem(1, "Steel Sword", 100, Icons.Default.Gavel, "Weapon", Color(0xFFEF9A9A), "A sturdy blade for warriors."),
+        ShopItem(2, "Magic Wand", 150, Icons.Default.AutoFixHigh, "Weapon", Color(0xFFCE93D8), "Focuses arcane energy."),
+        ShopItem(3, "Iron Shield", 120, Icons.Default.Shield, "Off-hand", Color(0xFF90CAF9), "Provides great protection."),
+        ShopItem(4, "Lucky Coin", 80, Icons.Default.Casino, "Accessory", Color(0xFFFFF176), "Increases luck slightly."),
+        ShopItem(5, "Fireball", 200, Icons.Default.Whatshot, "Skill", Color(0xFFFFB300), "Deals area fire damage."),
+        ShopItem(6, "Whirlwind", 180, Icons.Default.Cyclone, "Skill", Color(0xFFAED581), "Spinning attack for warriors.")
     )
 
     Scaffold(
@@ -72,7 +76,7 @@ fun ShopScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, "Back", modifier = Modifier.size(32.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(32.dp))
                 }
                 Text("Questly Shop", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Surface(
@@ -86,7 +90,7 @@ fun ShopScreen(onBack: () -> Unit) {
                     ) {
                         Icon(Icons.Default.Stars, null, modifier = Modifier.size(20.dp), tint = Color.Black)
                         Spacer(Modifier.width(4.dp))
-                        Text("${userPoints.intValue}", fontWeight = FontWeight.Bold)
+                        Text("${PlayerStats.shopPoints}", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -104,8 +108,31 @@ fun ShopScreen(onBack: () -> Unit) {
             ) {
                 items(items) { item ->
                     ShopCard(item) {
-                        if (userPoints.intValue >= item.cost) {
-                            userPoints.intValue -= item.cost
+                        if (PlayerStats.shopPoints >= item.cost) {
+                            PlayerStats.shopPoints -= item.cost
+                            
+                            // Add to inventory or skills based on category
+                            if (item.category == "Skill") {
+                                val newSkill = Skill(item.name, item.description, item.icon, 1)
+                                if (!PlayerStats.ownedSkills.any { it.name == item.name }) {
+                                    PlayerStats.ownedSkills.add(newSkill)
+                                    Toast.makeText(context, "Purchased ${item.name}!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "You already own this skill!", Toast.LENGTH_SHORT).show()
+                                    PlayerStats.shopPoints += item.cost // Refund
+                                }
+                            } else {
+                                val newEquip = Equipment(item.name, item.category, item.icon)
+                                if (!PlayerStats.ownedEquipment.any { it.name == item.name }) {
+                                    PlayerStats.ownedEquipment.add(newEquip)
+                                    Toast.makeText(context, "Purchased ${item.name}!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "You already own this item!", Toast.LENGTH_SHORT).show()
+                                    PlayerStats.shopPoints += item.cost // Refund
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Not enough points!", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -116,10 +143,16 @@ fun ShopScreen(onBack: () -> Unit) {
 
 @Composable
 fun ShopCard(item: ShopItem, onBuy: () -> Unit) {
+    val alreadyOwned = if (item.category == "Skill") {
+        PlayerStats.ownedSkills.any { it.name == item.name }
+    } else {
+        PlayerStats.ownedEquipment.any { it.name == item.name }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(200.dp)
             .border(2.dp, Color.Black, RoundedCornerShape(20.dp)),
         colors = CardDefaults.cardColors(containerColor = item.color),
         shape = RoundedCornerShape(20.dp)
@@ -137,20 +170,29 @@ fun ShopCard(item: ShopItem, onBuy: () -> Unit) {
             ) {
                 Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = Color.Black)
             }
-            Spacer(Modifier.height(8.dp))
-            Text(item.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(item.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Spacer(modifier = Modifier.height(12.dp))
+            
             Button(
                 onClick = onBuy,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                enabled = !alreadyOwned,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    disabledContainerColor = Color.Gray.copy(alpha = 0.5f)
+                ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.height(36.dp).border(1.dp, Color.Black, RoundedCornerShape(10.dp)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Stars, null, modifier = Modifier.size(14.dp), tint = Color(0xFFFFB300))
-                    Spacer(Modifier.width(4.dp))
-                    Text("${item.cost}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (alreadyOwned) {
+                    Text("Owned", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Stars, null, modifier = Modifier.size(14.dp), tint = Color(0xFFFFB300))
+                        Spacer(Modifier.width(4.dp))
+                        Text("${item.cost}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
                 }
             }
         }

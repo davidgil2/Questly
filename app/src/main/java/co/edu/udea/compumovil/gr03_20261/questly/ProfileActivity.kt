@@ -1,9 +1,11 @@
 package co.edu.udea.compumovil.gr03_20261.questly
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -27,22 +29,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
 
-data class Stat(val name: String, val value: Int, val icon: ImageVector, val color: Color)
+data class StatDisplay(val name: String, val value: Int, val icon: ImageVector, val color: Color, val onIncrease: () -> Unit)
 data class Achievement(val title: String, val description: String, val icon: ImageVector, val unlocked: Boolean)
 
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val userName = intent.getStringExtra("USER_NAME") ?: "Hero"
-        val userClass = intent.getStringExtra("USER_CLASS") ?: "Warrior"
         
         setContent {
             QuestlyTheme {
                 ProfileScreen(
-                    userName = userName,
-                    userClass = userClass,
-                    onBack = { finish() }
+                    onBack = { finish() },
+                    onNavigateToInventory = {
+                        val intent = Intent(this, InventoryActivity::class.java).apply {
+                            putExtra("USER_CLASS", PlayerStats.userClass)
+                        }
+                        startActivity(intent)
+                    }
                 )
             }
         }
@@ -50,21 +54,23 @@ class ProfileActivity : ComponentActivity() {
 }
 
 @Composable
-fun ProfileScreen(userName: String, userClass: String, onBack: () -> Unit) {
+fun ProfileScreen(
+    onBack: () -> Unit,
+    onNavigateToInventory: () -> Unit
+) {
     val backgroundColor = Color(0xFFE8F5E9)
-    
+    var showRewardDialog by remember { mutableStateOf(false) }
+
     val stats = listOf(
-        Stat("STR", 15, Icons.Default.FitnessCenter, Color(0xFFEF9A9A)),
-        Stat("INT", 12, Icons.AutoMirrored.Filled.MenuBook, Color(0xFFCE93D8)),
-        Stat("AGI", 10, Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF81D4FA)),
-        Stat("LUK", 5, Icons.Default.Casino, Color(0xFFFFF176))
+        StatDisplay("STR", PlayerStats.str, Icons.Default.FitnessCenter, Color(0xFFEF9A9A)) { PlayerStats.str++; PlayerStats.statPoints-- },
+        StatDisplay("INT", PlayerStats.int, Icons.AutoMirrored.Filled.MenuBook, Color(0xFFCE93D8)) { PlayerStats.int++; PlayerStats.statPoints-- },
+        StatDisplay("AGI", PlayerStats.agi, Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF81D4FA)) { PlayerStats.agi++; PlayerStats.statPoints-- },
+        StatDisplay("LUK", PlayerStats.luk, Icons.Default.Casino, Color(0xFFFFF176)) { PlayerStats.luk++; PlayerStats.statPoints-- }
     )
-    
+
     val achievements = listOf(
         Achievement("First Quest", "Completed your first daily habit.", Icons.Default.CheckCircle, true),
-        Achievement("Dragon Tamer", "Survived the encounter with the Emerald Dragon.", Icons.Default.AutoAwesome, true),
-        Achievement("Wealthy Traveler", "Saved up more than 500 points.", Icons.Default.Stars, false),
-        Achievement("Early Bird", "Completed all morning habits before 8 AM.", Icons.Default.WbSunny, false)
+        Achievement("Dragon Tamer", "Survived the encounter with the Emerald Dragon.", Icons.Default.AutoAwesome, true)
     )
 
     Scaffold(
@@ -93,58 +99,99 @@ fun ProfileScreen(userName: String, userClass: String, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
                         .border(2.dp, Color.Black, RoundedCornerShape(24.dp))
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(20.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(Color(0xFF81B692), CircleShape)
-                            .border(2.dp, Color.Black, CircleShape),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = when(userClass) {
-                                "Warrior" -> Icons.Default.Shield
-                                "Mage" -> Icons.Default.AutoFixHigh
-                                else -> Icons.Default.Explore
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = Color.White
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .background(Color(0xFF81B692), CircleShape)
+                                .border(2.dp, Color.Black, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = when(PlayerStats.userClass) {
+                                    "Warrior" -> Icons.Default.Shield
+                                    "Mage" -> Icons.Default.AutoFixHigh
+                                    else -> Icons.Default.Explore
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(20.dp))
+                        Column {
+                            Text(PlayerStats.name, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                            Text("Class: ${PlayerStats.userClass}", fontSize = 18.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val progress = PlayerStats.experience.toFloat() / PlayerStats.experienceToNextLevel.toFloat()
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).border(1.dp, Color.Black, CircleShape),
+                                color = Color(0xFF4CAF50),
+                                trackColor = Color.White,
+                                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                            Text("Level ${PlayerStats.level} Adventurer (${PlayerStats.experience}/${PlayerStats.experienceToNextLevel} XP)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
-                    Spacer(modifier = Modifier.width(20.dp))
-                    Column {
-                        Text(userName, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                        Text("Class: $userClass", fontSize = 18.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LinearProgressIndicator(
-                            progress = { 0.6f },
-                            modifier = Modifier.fillMaxWidth().height(8.dp).border(1.dp, Color.Black, CircleShape),
-                            color = Color(0xFF4CAF50),
-                            trackColor = Color.White,
-                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                        )
-                        Text("Level 5 Adventurer", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(
+                        onClick = onNavigateToInventory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(2.dp, Color.Black, RoundedCornerShape(12.dp)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Inventory, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Equipment & Skills", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (PlayerStats.pendingRewards) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { showRewardDialog = true },
+                            modifier = Modifier.fillMaxWidth().border(2.dp, Color.Black, RoundedCornerShape(12.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color.Black)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Open Reward Chest!", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
 
             item {
-                Text("Base Statistics", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Base Statistics", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    if (PlayerStats.statPoints > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(color = Color.Red, shape = CircleShape) {
+                            Text("${PlayerStats.statPoints} points", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     stats.forEach { stat ->
-                        StatCard(stat, Modifier.weight(1f))
+                        StatCard(stat, Modifier.weight(1f), PlayerStats.statPoints > 0)
                     }
                 }
             }
@@ -152,18 +199,25 @@ fun ProfileScreen(userName: String, userClass: String, onBack: () -> Unit) {
             item {
                 Text("Achievements", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
-            
+
             items(achievements) { achievement ->
                 AchievementRow(achievement)
             }
-            
+
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
+
+    if (showRewardDialog) {
+        RewardChestDialog(onDismiss = { 
+            showRewardDialog = false 
+            PlayerStats.pendingRewards = false
+        })
     }
 }
 
 @Composable
-fun StatCard(stat: Stat, modifier: Modifier) {
+fun StatCard(stat: StatDisplay, modifier: Modifier, canIncrease: Boolean) {
     Column(
         modifier = modifier
             .background(stat.color, RoundedCornerShape(16.dp))
@@ -174,7 +228,43 @@ fun StatCard(stat: Stat, modifier: Modifier) {
         Icon(stat.icon, null, modifier = Modifier.size(24.dp), tint = Color.Black)
         Text(stat.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         Text("${stat.value}", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+        if (canIncrease) {
+            IconButton(onClick = stat.onIncrease, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.AddCircle, contentDescription = "Increase", tint = Color.Black)
+            }
+        }
     }
+}
+
+@Composable
+fun RewardChestDialog(onDismiss: () -> Unit) {
+    val reward = remember {
+        val options = listOf(
+            "New Skill: Whirlwind",
+            "Magic Wand (Weapon)",
+            "500 Shop Points",
+            "Mystery Potion"
+        )
+        options.random()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Level Up Reward!", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.CardGiftcard, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFFFFD54F))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("You found:", fontSize = 16.sp)
+                Text(reward, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Collect")
+            }
+        }
+    )
 }
 
 @Composable
@@ -211,10 +301,6 @@ fun AchievementRow(achievement: Achievement) {
                     fontSize = 14.sp,
                     color = if (achievement.unlocked) Color.DarkGray else Color.Gray
                 )
-            }
-            if (!achievement.unlocked) {
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(Icons.Default.Lock, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
             }
         }
     }
