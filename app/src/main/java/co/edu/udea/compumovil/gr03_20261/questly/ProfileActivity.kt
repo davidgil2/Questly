@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
+import com.google.firebase.auth.FirebaseAuth
 
 data class StatDisplay(val name: String, val value: Int, val icon: ImageVector, val color: Color, val onIncrease: () -> Unit)
 data class Achievement(val title: String, val description: String, val icon: ImageVector, val unlocked: Boolean)
@@ -46,6 +48,13 @@ class ProfileActivity : ComponentActivity() {
                             putExtra("USER_CLASS", PlayerStats.userClass)
                         }
                         startActivity(intent)
+                    },
+                    onLogout = {
+                        FirebaseAuth.getInstance().signOut()
+                        val intent = Intent(this, LoginActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
                     }
                 )
             }
@@ -56,7 +65,8 @@ class ProfileActivity : ComponentActivity() {
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
-    onNavigateToInventory: () -> Unit
+    onNavigateToInventory: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val backgroundColor = Color(0xFFE8F5E9)
     var showRewardDialog by remember { mutableStateOf(false) }
@@ -81,13 +91,25 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(32.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(32.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Character Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Character Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                
+                IconButton(onClick = onLogout) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = "Cerrar Sesión",
+                        tint = Color(0xFFD32F2F),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     ) { innerPadding ->

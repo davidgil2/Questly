@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "368454392406",
+    "project_id": "questly-377aa",
+    "storage_bucket": "questly-377aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:368454392406:android:d53ab28b73b519327d79f7",
+        "android_client_info": {
+          "package_name": "co.edu.udea.compumovil.gr03_20261.questly"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "368454392406-tl3it7jc2gdnhba818ohm6p93oai2e70.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "co.edu.udea.compumovil.gr03_20261.questly",
+            "certificate_hash": "d6693b771b334b1bd3a8f6baa70f903d8ef7487e"
+          }
+        },
+        {
+          "client_id": "368454392406-465gbcfsp9403rfmfnpq6dvc6onf7jm4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7rF2V9nQ7pABwxZNv3xyHd2Qn-n1qLRU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "368454392406-465gbcfsp9403rfmfnpq6dvc6onf7jm4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
