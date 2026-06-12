@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +30,13 @@ import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        if (PersistenceManager.isOnboardingDone(this)) {
+            startActivity(Intent(this, HabitTrackerActivity::class.java))
+            finish()
+            return
+        }
+
         enableEdgeToEdge()
         setContent {
             QuestlyTheme {
@@ -44,9 +52,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WelcomeScreen(onNavigateNext: () -> Unit) {
-    val backgroundColor = Color(0xFFF3D9C9)
-    val primaryGreen = Color(0xFF81B692)
-    val darkGray = Color(0xFF333333)
+    // Colores RPG: Verde pradera, Oro aventura y Marrón orgánico
+    val backgroundColor = Color(0xFFF1F8E9) // Verde muy claro (tranquilidad)
+    val primaryGreen = Color(0xFF4CAF50)    // Verde brillante (aventura)
+    val adventureGold = Color(0xFFFFC107)   // Oro (recompensas/RPG)
+    val woodBrown = Color(0xFF5D4037)       // Marrón madera (texto/estabilidad)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -78,7 +88,7 @@ fun WelcomeScreen(onNavigateNext: () -> Unit) {
                         withStyle(style = SpanStyle(color = primaryGreen)) {
                             append("Quest")
                         }
-                        withStyle(style = SpanStyle(color = darkGray)) {
+                        withStyle(style = SpanStyle(color = adventureGold)) {
                             append("ly")
                         }
                     },
@@ -90,36 +100,39 @@ fun WelcomeScreen(onNavigateNext: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "A daily planner and habit tracker for students and young adults.",
+                    text = "Tu aventura diaria comienza aquí. Convierte tus hábitos en misiones épicas.",
                     fontSize = 18.sp,
-                    color = darkGray,
+                    color = woodBrown,
                     fontWeight = FontWeight.Medium,
                     lineHeight = 24.sp
                 )
             }
             
             Box(contentAlignment = Alignment.Center) {
+                // Icono central con un resplandor suave
                 Icon(
                     imageVector = Icons.Default.Grass,
                     contentDescription = null,
-                    tint = primaryGreen,
+                    tint = primaryGreen.copy(alpha = 0.7f),
                     modifier = Modifier.size(240.dp)
                 )
             }
             
+            // Botón de inicio tipo "Start Quest"
             Box(
                 modifier = Modifier
                     .padding(bottom = 60.dp)
-                    .size(80.dp)
-                    .background(darkGray, CircleShape)
+                    .size(85.dp)
+                    .background(adventureGold, CircleShape)
+                    .border(3.dp, woodBrown, CircleShape)
                     .clickable { onNavigateNext() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Get Started",
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
+                    contentDescription = "Empezar Aventura",
+                    tint = woodBrown,
+                    modifier = Modifier.size(45.dp)
                 )
             }
         }

@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,7 @@ class DailyEventActivity : ComponentActivity() {
 
 @Composable
 fun DailyEventScreen(event: StoryEvent, onFinish: () -> Unit) {
+    val context = LocalContext.current
     val backgroundColor = Color(0xFF1B5E20)
     var selectedChoice by remember { mutableStateOf<Choice?>(null) }
     var selectedSkill by remember { mutableStateOf<Skill?>(null) }
@@ -122,6 +124,7 @@ fun DailyEventScreen(event: StoryEvent, onFinish: () -> Unit) {
                             if (eventResult == true) {
                                 val leveledUp = PlayerStats.addExperience(selectedChoice!!.experienceReward)
                                 if (leveledUp) showLevelUp = true
+                                PlayerStats.save(context)
                             }
                         }
                     )
@@ -204,6 +207,13 @@ fun ActionPhase(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(PlayerStats.equippedSkills) { skill ->
                 val isSelected = selectedSkill == skill
+                val skillIcon = when(skill.iconName) {
+                    "FlashOn" -> Icons.Default.FlashOn
+                    "AutoAwesome" -> Icons.Default.AutoAwesome
+                    "DirectionsRun" -> Icons.Default.DirectionsRun
+                    "Security" -> Icons.Default.Security
+                    else -> Icons.Default.Add
+                }
                 Box(
                     modifier = Modifier
                         .size(60.dp)
@@ -212,7 +222,7 @@ fun ActionPhase(
                         .clickable { onSkillSelect(skill) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(skill.icon, null, tint = if (isSelected) Color.Black else Color.White)
+                    Icon(skillIcon, null, tint = if (isSelected) Color.Black else Color.White)
                 }
             }
         }

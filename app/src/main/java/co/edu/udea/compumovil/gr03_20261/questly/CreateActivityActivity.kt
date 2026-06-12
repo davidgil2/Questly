@@ -32,27 +32,50 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
+import kotlinx.coroutines.launch
 
 class CreateActivityActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val isEdit = intent.getBooleanExtra("IS_EDIT", false)
+        val editHabitId = intent.getLongExtra("HABIT_ID", -1L)
+        val editTitle = intent.getStringExtra("HABIT_TITLE") ?: ""
+        val editTime = intent.getStringExtra("HABIT_TIME") ?: "07:00 AM"
+        val editColorInt = intent.getIntExtra("HABIT_COLOR", Color.Gray.toArgb())
+        val editIconName = intent.getStringExtra("HABIT_ICON_NAME") ?: "Add"
+        val editQuests = intent.getStringArrayListExtra("HABIT_QUESTS") ?: arrayListOf()
+        val existingTimes = intent.getStringArrayListExtra("EXISTING_TIMES") ?: arrayListOf()
+
         setContent {
             QuestlyTheme {
-                var showDetail by remember { mutableStateOf(false) }
-                var selectedTitle by remember { mutableStateOf("") }
-                var selectedColor by remember { mutableStateOf(Color.Gray) }
-                var selectedIcon by remember { mutableStateOf(Icons.Default.Add) }
-                var selectedIconName by remember { mutableStateOf("Add") }
+                var showDetail by remember { mutableStateOf(isEdit) }
+                var selectedTitle by remember { mutableStateOf(editTitle) }
+                var selectedColor by remember { mutableStateOf(Color(editColorInt)) }
+                var selectedIconName by remember { mutableStateOf(editIconName) }
+                var initialQuests by remember { mutableStateOf(editQuests.toList()) }
+                var initialTime by remember { mutableStateOf(editTime) }
+
+                val selectedIcon = when(selectedIconName) {
+                    "WbSunny" -> Icons.Default.WbSunny
+                    "NightsStay" -> Icons.Default.NightsStay
+                    "FitnessCenter" -> Icons.Default.FitnessCenter
+                    "Book" -> Icons.Default.Book
+                    "WaterDrop" -> Icons.Default.WaterDrop
+                    "Restaurant" -> Icons.Default.Restaurant
+                    else -> Icons.Default.Add
+                }
 
                 if (!showDetail) {
                     CreateActivityListScreen(
                         onBack = { finish() },
-                        onSelectActivity = { title, color, icon, iconName ->
+                        onSelectActivity = { title, color, _, iconName ->
                             selectedTitle = title
                             selectedColor = color
-                            selectedIcon = icon
                             selectedIconName = iconName
+                            initialQuests = emptyList()
+                            initialTime = "07:00 AM"
                             showDetail = true
                         }
                     )
@@ -61,14 +84,28 @@ class CreateActivityActivity : ComponentActivity() {
                         title = selectedTitle,
                         color = selectedColor,
                         icon = selectedIcon,
-                        onBack = { showDetail = false },
+                        iconName = selectedIconName,
+                        habitId = editHabitId,
+                        initialQuests = initialQuests,
+                        initialTime = initialTime,
+                        existingTimes = existingTimes,
+                        onBack = { if (isEdit) finish() else showDetail = false },
                         onSave = { habit ->
                             val resultIntent = Intent().apply {
+                                putExtra("HABIT_ID", if (isEdit) editHabitId else habit.id)
                                 putExtra("HABIT_TITLE", habit.title)
                                 putExtra("HABIT_TIME", habit.time)
-                                putExtra("HABIT_COLOR", habit.color.toArgb())
-                                putExtra("HABIT_ICON_NAME", selectedIconName)
+                                putExtra("HABIT_COLOR", habit.colorValue.toInt())
+                                putExtra("HABIT_ICON_NAME", habit.iconName)
                                 putStringArrayListExtra("HABIT_QUESTS", ArrayList(habit.quests))
+                            }
+                            setResult(Activity.RESULT_OK, resultIntent)
+                            finish()
+                        },
+                        onDelete = { id ->
+                            val resultIntent = Intent().apply {
+                                putExtra("HABIT_ID", id)
+                                putExtra("HABIT_DELETED", true)
                             }
                             setResult(Activity.RESULT_OK, resultIntent)
                             finish()
@@ -149,17 +186,35 @@ fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Colo
 }
 
 @Composable
-fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onBack: () -> Unit, onSave: (Habit) -> Unit) {
+fun EditActivityDetailScreen(
+    title: String, 
+    color: Color, 
+    icon: ImageVector, 
+    iconName: String, 
+    habitId: Long = -1L,
+    initialQuests: List<String> = emptyList(),
+    initialTime: String = "07:00 AM",
+    existingTimes: List<String> = emptyList(),
+    onBack: () -> Unit, 
+    onSave: (Habit) -> Unit,
+    onDelete: (Long) -> Unit = {}
+) {
     val backgroundColor = Color(0xFFE8F5E9)
     var questText by remember { mutableStateOf("") }
-    val quests = remember { mutableStateListOf<String>() }
-    var time by remember { mutableStateOf("07:00 AM") }
+    val quests = remember { mutableStateListOf<String>().apply { addAll(initialQuests) } }
+    var time by remember { mutableStateOf(initialTime) }
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // Identificar si es una tarea por defecto para protegerla de eliminación
+    val isDefaultHabit = habitId == 1L || habitId == 2L || title == "Buenos Días" || title == "Buenas Noches"
 
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
-        containerColor = backgroundColor
+        containerColor = backgroundColor,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -174,7 +229,7 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Add Activity", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                Text(if (habitId != -1L) "Edit Activity" else "Add Activity", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.Close, contentDescription = "Close")
                 }
@@ -208,11 +263,14 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
                     .border(2.dp, Color.Black, RoundedCornerShape(20.dp))
                     .padding(12.dp)
             ) {
-                quests.forEach { quest ->
+                quests.forEachIndexed { index, quest ->
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.RadioButtonUnchecked, null, tint = Color.Gray)
                         Spacer(Modifier.width(8.dp))
-                        Text(quest, fontSize = 18.sp)
+                        Text(quest, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { quests.removeAt(index) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Eliminar sub-tarea", tint = Color.Red.copy(alpha = 0.7f))
+                        }
                     }
                 }
                 
@@ -248,12 +306,33 @@ fun EditActivityDetailScreen(title: String, color: Color, icon: ImageVector, onB
             Spacer(Modifier.height(40.dp))
             
             Button(
-                onClick = { onSave(Habit(title = title, time = time, icon = icon, color = color, quests = quests.toList())) },
+                onClick = { 
+                    if (existingTimes.any { it.equals(time, ignoreCase = true) }) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Error: Ya tienes una actividad a las $time. ¡Elige otro minuto!")
+                        }
+                    } else {
+                        onSave(Habit(id = if (habitId != -1L) habitId else System.currentTimeMillis(), title = title, time = time, iconName = iconName, colorValue = color.toArgb().toLong(), quests = quests.toList()))
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().height(60.dp).border(2.dp, Color.Black, RoundedCornerShape(30.dp)),
                 colors = ButtonDefaults.buttonColors(containerColor = color),
                 shape = RoundedCornerShape(30.dp)
             ) {
-                Text("Save Activity", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(if (habitId != -1L) "Update Activity" else "Save Activity", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+            
+            // Solo mostrar botón de eliminar si NO es una tarea por defecto
+            if (habitId != -1L && !isDefaultHabit) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = { onDelete(habitId) },
+                    modifier = Modifier.fillMaxWidth().height(60.dp).border(2.dp, Color.Red, RoundedCornerShape(30.dp)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                    shape = RoundedCornerShape(30.dp)
+                ) {
+                    Text("Eliminar Actividad", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
             }
             
             Spacer(Modifier.height(24.dp))

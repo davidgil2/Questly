@@ -1,7 +1,10 @@
 package co.edu.udea.compumovil.gr03_20261.questly
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,9 +13,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,10 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -39,18 +47,12 @@ class HabitTrackerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val userName = intent.getStringExtra("USER_NAME") ?: "John Doe"
-        val userClass = intent.getStringExtra("USER_CLASS") ?: "Warrior"
-        val wakeTime = intent.getStringExtra("WAKE_TIME") ?: "05:00"
-        val sleepTime = intent.getStringExtra("SLEEP_TIME") ?: "22:00"
         
+        PlayerStats.load(this)
+
         setContent {
             QuestlyTheme {
                 HabitTrackerScreen(
-                    userName = userName,
-                    userClass = userClass,
-                    wakeTime = wakeTime,
-                    sleepTime = sleepTime,
                     onNavigateToShop = {
                         val intent = Intent(this, ShopActivity::class.java)
                         startActivity(intent)
@@ -61,8 +63,8 @@ class HabitTrackerActivity : ComponentActivity() {
                     },
                     onNavigateToProfile = {
                         val intent = Intent(this, ProfileActivity::class.java).apply {
-                            putExtra("USER_NAME", userName)
-                            putExtra("USER_CLASS", userClass)
+                            putExtra("USER_NAME", PlayerStats.name)
+                            putExtra("USER_CLASS", PlayerStats.userClass)
                         }
                         startActivity(intent)
                     }
@@ -92,23 +94,26 @@ fun sortHabits(habits: MutableList<Habit>) {
 
 @Composable
 fun HabitTrackerScreen(
-    userName: String, 
-    userClass: String,
-    wakeTime: String,
-    sleepTime: String,
-    onNavigateToShop: () -> Unit, 
+    onNavigateToShop: () -> Unit,
     onNavigateToEvent: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
     val context = LocalContext.current
-    val backgroundColor = Color(0xFFE8F5E9)
-    var points by remember { mutableIntStateOf(150) }
+    val backgroundColor = Color(0xFFF1F8E9)
     
-    val habits = remember { 
-        mutableStateListOf(
-            Habit(1, "Buenos Días", wakeTime, Icons.Default.WbSunny, Color(0xFFFFF176), listOf("Tiende la cama", "Bebe un vaso de agua")),
-            Habit(2, "Buenas Noches", sleepTime, Icons.Default.NightsStay, Color(0xFF90CAF9), listOf("Leer 10 páginas", "Planear mañana"))
-        ).also { sortHabits(it) }
+    val habits = remember {
+        val loaded = PersistenceManager.loadHabits(context).toMutableList()
+        val goldColor = Color(0xFFFFD600).toArgb().toLong()
+        val nightColor = Color(0xFF1A237E).toArgb().toLong()
+
+        if (loaded.isEmpty()) {
+            mutableStateListOf(
+                Habit(1, "Buenos Días", PlayerStats.wakeTime, "WbSunny", goldColor, listOf("Tiende la cama", "Bebe un vaso de agua")),
+                Habit(2, "Buenas Noches", PlayerStats.sleepTime, "NightsStay", nightColor, listOf("Leer 10 páginas", "Planear mañana"))
+            ).also { sortHabits(it) }
+        } else {
+            mutableStateListOf<Habit>().apply { addAll(loaded) }.also { sortHabits(it) }
+        }
     }
 
     val createActivityLauncher = rememberLauncherForActivityResult(
@@ -116,30 +121,54 @@ fun HabitTrackerScreen(
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val data = result.data
+            val isDeleted = data?.getBooleanExtra("HABIT_DELETED", false) ?: false
+            val id = data?.getLongExtra("HABIT_ID", -1L) ?: -1L
+            
+            if (isDeleted) {
+                if (id != -1L) {
+                    habits.removeAll { it.id == id }
+                    PersistenceManager.saveHabits(context, habits.toList())
+                }
+                return@rememberLauncherForActivityResult
+            }
+
             val title = data?.getStringExtra("HABIT_TITLE") ?: ""
             val time = data?.getStringExtra("HABIT_TIME") ?: ""
-            val colorInt = data?.getIntExtra("HABIT_COLOR", Color.Gray.value.toInt()) ?: Color.Gray.value.toInt()
+            val colorLong = data?.getIntExtra("HABIT_COLOR", Color.Gray.toArgb())?.toLong() ?: Color.Gray.toArgb().toLong()
             val iconName = data?.getStringExtra("HABIT_ICON_NAME") ?: "Add"
             val quests = data?.getStringArrayListExtra("HABIT_QUESTS") ?: arrayListOf<String>()
 
-            val icon = when (iconName) {
-                "FitnessCenter" -> Icons.Default.FitnessCenter
-                "Book" -> Icons.Default.Book
-                "WaterDrop" -> Icons.Default.WaterDrop
-                "Restaurant" -> Icons.Default.Restaurant
-                else -> Icons.Default.Add
+            if (id != -1L) {
+                val index = habits.indexOfFirst { it.id == id }
+                if (index != -1) {
+                    val updatedHabit = habits[index].copy(
+                        title = title,
+                        time = time,
+                        colorValue = colorLong,
+                        iconName = iconName,
+                        quests = quests
+                    )
+                    habits[index] = updatedHabit
+                    HabitNotificationManager.scheduleNotification(context, updatedHabit)
+                }
+            } else {
+                val newHabit = Habit(
+                    title = title,
+                    time = time,
+                    iconName = iconName,
+                    colorValue = colorLong,
+                    quests = quests
+                )
+                habits.add(newHabit)
+                HabitNotificationManager.scheduleNotification(context, newHabit)
             }
-
-            val newHabit = Habit(
-                title = title,
-                time = time,
-                icon = icon,
-                color = Color(colorInt.toLong()),
-                quests = quests
-            )
-            habits.add(newHabit)
             sortHabits(habits)
+            PersistenceManager.saveHabits(context, habits.toList())
         }
+    }
+
+    LaunchedEffect(habits.size) {
+        PersistenceManager.saveHabits(context, habits.toList())
     }
 
     Scaffold(
@@ -149,7 +178,7 @@ fun HabitTrackerScreen(
             Column(horizontalAlignment = Alignment.End) {
                 FloatingActionButton(
                     onClick = onNavigateToEvent,
-                    containerColor = Color(0xFF1B5E20),
+                    containerColor = Color(0xFF2E7D32),
                     contentColor = Color.White,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp)).size(64.dp)
@@ -183,14 +212,16 @@ fun HabitTrackerScreen(
                 verticalAlignment = Alignment.Top
             ) {
                 Column {
-                    Text("Today", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                    Text("Marzo 24", fontSize = 28.sp)
+                    Text("Today", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF33691E))
+                    Text("Marzo 24", fontSize = 28.sp, color = Color(0xFF558B2F))
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
                     Button(
                         onClick = {
-                            val intent = Intent(context, CreateActivityActivity::class.java)
+                            val intent = Intent(context, CreateActivityActivity::class.java).apply {
+                                putStringArrayListExtra("EXISTING_TIMES", ArrayList(habits.map { it.time }))
+                            }
                             createActivityLauncher.launch(intent)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE082)),
@@ -210,38 +241,10 @@ fun HabitTrackerScreen(
                         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Stars, null, modifier = Modifier.size(16.dp), tint = Color.Black)
                             Spacer(Modifier.width(4.dp))
-                            Text("$points", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("${PlayerStats.shopPoints}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
                 }
-            }
-            
-            Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateToProfile() }
-                    .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = when(userClass) {
-                        "Warrior" -> Icons.Default.Shield
-                        "Mage" -> Icons.Default.AutoFixHigh
-                        else -> Icons.Default.Explore
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = Color(0xFF1B5E20)
-                )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Bienvenido, $userName", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("Clase: $userClass | Ver Perfil", fontSize = 14.sp, color = Color.Gray)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
             }
             
             Spacer(Modifier.height(24.dp))
@@ -263,13 +266,34 @@ fun HabitTrackerScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 items(habits) { habit ->
-                    HabitItem(habit, onQuestCompleted = { points += 10 })
+                    HabitItem(
+                        habit = habit, 
+                        onQuestCompleted = { 
+                            PlayerStats.shopPoints += 10
+                            PlayerStats.save(context)
+                        },
+                        onDoubleClick = {
+                            val intent = Intent(context, CreateActivityActivity::class.java).apply {
+                                putExtra("HABIT_ID", habit.id)
+                                putExtra("HABIT_TITLE", habit.title)
+                                putExtra("HABIT_TIME", habit.time)
+                                putExtra("HABIT_COLOR", habit.colorValue.toInt())
+                                putExtra("HABIT_ICON_NAME", habit.iconName)
+                                putStringArrayListExtra("HABIT_QUESTS", ArrayList(habit.quests))
+                                putExtra("IS_EDIT", true)
+                                putStringArrayListExtra("EXISTING_TIMES", ArrayList(habits.filter { it.id != habit.id }.map { it.time }))
+                            }
+                            createActivityLauncher.launch(intent)
+                        }
+                    )
                 }
                 
                 item {
                     Button(
                         onClick = {
-                            val intent = Intent(context, CreateActivityActivity::class.java)
+                            val intent = Intent(context, CreateActivityActivity::class.java).apply {
+                                putStringArrayListExtra("EXISTING_TIMES", ArrayList(habits.map { it.time }))
+                            }
                             createActivityLauncher.launch(intent)
                         },
                         modifier = Modifier
@@ -292,38 +316,54 @@ fun HabitTrackerScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HabitItem(habit: Habit, onQuestCompleted: () -> Unit) {
+fun HabitItem(habit: Habit, onQuestCompleted: () -> Unit, onDoubleClick: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f)
+    val bgColor = Color(habit.colorValue.toInt())
+    val contentColor = if (bgColor.luminance() < 0.4f) Color.White else Color.Black
+    
+    val habitIcon = when(habit.iconName) {
+        "WbSunny" -> Icons.Default.WbSunny
+        "NightsStay" -> Icons.Default.NightsStay
+        "FitnessCenter" -> Icons.Default.FitnessCenter
+        "Book" -> Icons.Default.Book
+        "WaterDrop" -> Icons.Default.WaterDrop
+        "Restaurant" -> Icons.Default.Restaurant
+        else -> Icons.Default.Add
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .border(2.dp, Color.Black, RoundedCornerShape(20.dp))
-            .background(habit.color, RoundedCornerShape(20.dp))
-            .clickable { expanded = !expanded }
+            .background(bgColor, RoundedCornerShape(20.dp))
+            .combinedClickable(
+                onClick = { expanded = !expanded },
+                onDoubleClick = onDoubleClick
+            )
             .padding(20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(habit.icon, null, modifier = Modifier.size(36.dp), tint = Color.Black)
+            Icon(habitIcon, null, modifier = Modifier.size(36.dp), tint = contentColor)
             Spacer(Modifier.width(16.dp))
-            Text(habit.title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1f))
-            Text(habit.time, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+            Text(habit.title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = contentColor, modifier = Modifier.weight(1f))
+            Text(habit.time, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = contentColor)
             Spacer(Modifier.width(8.dp))
             Icon(
                 Icons.Default.ExpandMore,
                 null,
                 modifier = Modifier.rotate(rotation).size(24.dp),
-                tint = Color.Black
+                tint = contentColor
             )
         }
 
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(top = 16.dp, start = 8.dp)) {
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.2f), thickness = 1.dp)
+                HorizontalDivider(color = contentColor.copy(alpha = 0.2f), thickness = 1.dp)
                 Spacer(Modifier.height(12.dp))
-                Text("Quests (+10 pts cada una):", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Quests (+10 pts cada una):", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = contentColor)
                 habit.quests.forEach { quest ->
                     var isDone by remember { mutableStateOf(false) }
                     Row(
@@ -341,13 +381,13 @@ fun HabitItem(habit: Habit, onQuestCompleted: () -> Unit) {
                             imageVector = if (isDone) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline, 
                             contentDescription = null, 
                             modifier = Modifier.size(24.dp), 
-                            tint = if (isDone) Color(0xFF4CAF50) else Color.Black
+                            tint = if (isDone) Color(0xFF4CAF50) else contentColor
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = quest, 
                             fontSize = 16.sp, 
-                            color = if (isDone) Color.Gray else Color.Black,
+                            color = if (isDone) contentColor.copy(alpha = 0.6f) else contentColor,
                             style = if (isDone) LocalTextStyle.current.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough) else LocalTextStyle.current
                         )
                     }

@@ -141,6 +141,7 @@ fun InventoryScreen(onBack: () -> Unit) {
                     "Body" -> PlayerStats.equippedBody = newItem
                     "Accessory" -> PlayerStats.equippedAccessory = newItem
                 }
+                PlayerStats.save(context)
                 showEquipmentPickerType = null
             },
             onDismiss = { showEquipmentPickerType = null }
@@ -162,6 +163,7 @@ fun InventoryScreen(onBack: () -> Unit) {
                     } else {
                         PlayerStats.equippedSkills.add(newSkill)
                     }
+                    PlayerStats.save(context)
                 }
                 showSkillPickerIndex = null
             },
@@ -223,7 +225,15 @@ fun EquipmentSlot(equipment: Equipment?, label: String, modifier: Modifier, onCl
             Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(modifier = Modifier.height(4.dp))
             if (equipment != null) {
-                Icon(equipment.icon, null, modifier = Modifier.size(32.dp), tint = Color(0xFF7B1FA2))
+                val equipmentIcon = when(equipment.iconName) {
+                    "Gavel" -> Icons.Default.Gavel
+                    "AutoFixHigh" -> Icons.Default.AutoFixHigh
+                    "AdsClick" -> Icons.Default.AdsClick
+                    "Shield" -> Icons.Default.Shield
+                    "Checkroom" -> Icons.Default.Checkroom
+                    else -> Icons.Default.Add
+                }
+                Icon(equipmentIcon, null, modifier = Modifier.size(32.dp), tint = Color(0xFF7B1FA2))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(equipment.name, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
             } else {
@@ -248,13 +258,20 @@ fun SkillSlot(skill: Skill?, index: Int, onClick: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val skillIcon = when(skill?.iconName) {
+                "FlashOn" -> Icons.Default.FlashOn
+                "AutoAwesome" -> Icons.Default.AutoAwesome
+                "DirectionsRun" -> Icons.AutoMirrored.Filled.DirectionsRun
+                "Security" -> Icons.Default.Security
+                else -> Icons.Default.Add
+            }
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .background(if (skill != null) Color(0xFFE1BEE7) else Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(skill?.icon ?: Icons.Default.Add, null, tint = if (skill != null) Color(0xFF4A148C) else Color.Gray)
+                Icon(skillIcon, null, tint = if (skill != null) Color(0xFF4A148C) else Color.Gray)
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -284,11 +301,19 @@ fun ItemPickerDialog(title: String, items: List<Equipment>, onItemSelected: (Equ
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(items) { item ->
+                        val itemIcon = when(item.iconName) {
+                            "Gavel" -> Icons.Default.Gavel
+                            "AutoFixHigh" -> Icons.Default.AutoFixHigh
+                            "AdsClick" -> Icons.Default.AdsClick
+                            "Shield" -> Icons.Default.Shield
+                            "Checkroom" -> Icons.Default.Checkroom
+                            else -> Icons.Default.Add
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onItemSelected(item) }.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(item.icon, null, tint = Color(0xFF7B1FA2))
+                            Icon(itemIcon, null, tint = Color(0xFF7B1FA2))
                             Spacer(Modifier.width(16.dp))
                             Text(item.name)
                         }
@@ -311,11 +336,18 @@ fun SkillPickerDialog(title: String, skills: List<Skill>, onSkillSelected: (Skil
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(skills) { skill ->
+                        val skillIcon = when(skill.iconName) {
+                            "FlashOn" -> Icons.Default.FlashOn
+                            "AutoAwesome" -> Icons.Default.AutoAwesome
+                            "DirectionsRun" -> Icons.AutoMirrored.Filled.DirectionsRun
+                            "Security" -> Icons.Default.Security
+                            else -> Icons.Default.Add
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { onSkillSelected(skill) }.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(skill.icon, null, tint = Color(0xFF7B1FA2))
+                            Icon(skillIcon, null, tint = Color(0xFF7B1FA2))
                             Spacer(Modifier.width(16.dp))
                             Column {
                                 Text(skill.name, fontWeight = FontWeight.Bold)

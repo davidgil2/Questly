@@ -44,14 +44,12 @@ class OnboardingActivity : ComponentActivity() {
             QuestlyTheme {
                 OnboardingFlow(onFinished = { name, characterClass, wakeTime, sleepTime ->
                     // Inicializamos las estadísticas del jugador con la clase elegida
-                    PlayerStats.initialize(name, characterClass)
+                    PlayerStats.initialize(name, characterClass, wakeTime, sleepTime)
+                    // Guardamos los datos iniciales
+                    PlayerStats.save(this)
+                    PersistenceManager.setOnboardingDone(this, true)
 
-                    val intent = Intent(this, HabitTrackerActivity::class.java).apply {
-                        putExtra("USER_NAME", name)
-                        putExtra("USER_CLASS", characterClass)
-                        putExtra("WAKE_TIME", wakeTime)
-                        putExtra("SLEEP_TIME", sleepTime)
-                    }
+                    val intent = Intent(this, HabitTrackerActivity::class.java)
                     startActivity(intent)
                     finish()
                 })

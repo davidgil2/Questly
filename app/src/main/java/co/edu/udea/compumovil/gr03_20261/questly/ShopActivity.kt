@@ -33,6 +33,7 @@ data class ShopItem(
     val name: String,
     val cost: Int,
     val icon: ImageVector,
+    val iconName: String,
     val category: String,
     val color: Color,
     val description: String = ""
@@ -56,12 +57,12 @@ fun ShopScreen(onBack: () -> Unit) {
     val context = LocalContext.current
 
     val items = listOf(
-        ShopItem(1, "Steel Sword", 100, Icons.Default.Gavel, "Weapon", Color(0xFFEF9A9A), "A sturdy blade for warriors."),
-        ShopItem(2, "Magic Wand", 150, Icons.Default.AutoFixHigh, "Weapon", Color(0xFFCE93D8), "Focuses arcane energy."),
-        ShopItem(3, "Iron Shield", 120, Icons.Default.Shield, "Off-hand", Color(0xFF90CAF9), "Provides great protection."),
-        ShopItem(4, "Lucky Coin", 80, Icons.Default.Casino, "Accessory", Color(0xFFFFF176), "Increases luck slightly."),
-        ShopItem(5, "Fireball", 200, Icons.Default.Whatshot, "Skill", Color(0xFFFFB300), "Deals area fire damage."),
-        ShopItem(6, "Whirlwind", 180, Icons.Default.Cyclone, "Skill", Color(0xFFAED581), "Spinning attack for warriors.")
+        ShopItem(1, "Steel Sword", 100, Icons.Default.Gavel, "Gavel", "Weapon", Color(0xFFEF9A9A), "A sturdy blade for warriors."),
+        ShopItem(2, "Magic Wand", 150, Icons.Default.AutoFixHigh, "AutoFixHigh", "Weapon", Color(0xFFCE93D8), "Focuses arcane energy."),
+        ShopItem(3, "Iron Shield", 120, Icons.Default.Shield, "Shield", "Off-hand", Color(0xFF90CAF9), "Provides great protection."),
+        ShopItem(4, "Lucky Coin", 80, Icons.Default.Casino, "Casino", "Accessory", Color(0xFFFFF176), "Increases luck slightly."),
+        ShopItem(5, "Fireball", 200, Icons.Default.Whatshot, "Whatshot", "Skill", Color(0xFFFFB300), "Deals area fire damage."),
+        ShopItem(6, "Whirlwind", 180, Icons.Default.Cyclone, "Cyclone", "Skill", Color(0xFFAED581), "Spinning attack for warriors.")
     )
 
     Scaffold(
@@ -113,19 +114,21 @@ fun ShopScreen(onBack: () -> Unit) {
                             
                             // Add to inventory or skills based on category
                             if (item.category == "Skill") {
-                                val newSkill = Skill(item.name, item.description, item.icon, 1)
+                                val newSkill = Skill(item.name, item.description, item.iconName, 1)
                                 if (!PlayerStats.ownedSkills.any { it.name == item.name }) {
                                     PlayerStats.ownedSkills.add(newSkill)
                                     Toast.makeText(context, "Purchased ${item.name}!", Toast.LENGTH_SHORT).show()
+                                    PlayerStats.save(context)
                                 } else {
                                     Toast.makeText(context, "You already own this skill!", Toast.LENGTH_SHORT).show()
                                     PlayerStats.shopPoints += item.cost // Refund
                                 }
                             } else {
-                                val newEquip = Equipment(item.name, item.category, item.icon)
+                                val newEquip = Equipment(item.name, item.category, item.iconName)
                                 if (!PlayerStats.ownedEquipment.any { it.name == item.name }) {
                                     PlayerStats.ownedEquipment.add(newEquip)
                                     Toast.makeText(context, "Purchased ${item.name}!", Toast.LENGTH_SHORT).show()
+                                    PlayerStats.save(context)
                                 } else {
                                     Toast.makeText(context, "You already own this item!", Toast.LENGTH_SHORT).show()
                                     PlayerStats.shopPoints += item.cost // Refund

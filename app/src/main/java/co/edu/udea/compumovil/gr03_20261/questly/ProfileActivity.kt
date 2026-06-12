@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,14 +69,31 @@ fun ProfileScreen(
     onNavigateToInventory: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
     val backgroundColor = Color(0xFFE8F5E9)
     var showRewardDialog by remember { mutableStateOf(false) }
 
     val stats = listOf(
-        StatDisplay("STR", PlayerStats.str, Icons.Default.FitnessCenter, Color(0xFFEF9A9A)) { PlayerStats.str++; PlayerStats.statPoints-- },
-        StatDisplay("INT", PlayerStats.int, Icons.AutoMirrored.Filled.MenuBook, Color(0xFFCE93D8)) { PlayerStats.int++; PlayerStats.statPoints-- },
-        StatDisplay("AGI", PlayerStats.agi, Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF81D4FA)) { PlayerStats.agi++; PlayerStats.statPoints-- },
-        StatDisplay("LUK", PlayerStats.luk, Icons.Default.Casino, Color(0xFFFFF176)) { PlayerStats.luk++; PlayerStats.statPoints-- }
+        StatDisplay("STR", PlayerStats.str, Icons.Default.FitnessCenter, Color(0xFFEF9A9A)) { 
+            PlayerStats.str++
+            PlayerStats.statPoints--
+            PlayerStats.save(context)
+        },
+        StatDisplay("INT", PlayerStats.int, Icons.AutoMirrored.Filled.MenuBook, Color(0xFFCE93D8)) { 
+            PlayerStats.int++
+            PlayerStats.statPoints--
+            PlayerStats.save(context)
+        },
+        StatDisplay("AGI", PlayerStats.agi, Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF81D4FA)) { 
+            PlayerStats.agi++
+            PlayerStats.statPoints--
+            PlayerStats.save(context)
+        },
+        StatDisplay("LUK", PlayerStats.luk, Icons.Default.Casino, Color(0xFFFFF176)) { 
+            PlayerStats.luk++
+            PlayerStats.statPoints--
+            PlayerStats.save(context)
+        }
     )
 
     val achievements = listOf(
@@ -234,6 +252,7 @@ fun ProfileScreen(
         RewardChestDialog(onDismiss = { 
             showRewardDialog = false 
             PlayerStats.pendingRewards = false
+            PlayerStats.save(context)
         })
     }
 }
