@@ -65,5 +65,6 @@ data class PlayerData(
     val equippedAccessory: Equipment?,
     val equippedSkills: List<Skill>,
     val ownedEquipment: List<Equipment>,
-    val ownedSkills: List<Skill>
+    val ownedSkills: List<Skill>,
+    val lastEventDate: String? = ""
 )

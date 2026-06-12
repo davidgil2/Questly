@@ -34,8 +34,60 @@ class DailyEventActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuestlyTheme {
-                val event = remember { EventRepository.getEventForToday() }
-                DailyEventScreen(event = event, onFinish = { finish() })
+                val isDone = remember { PlayerStats.isEventDoneToday() }
+                if (isDone) {
+                    AlreadyDoneScreen(onFinish = { finish() })
+                } else {
+                    val event = remember { EventRepository.getEventForToday() }
+                    // Marcar como hecho al ingresar para limitar a un solo acceso por día
+                    LaunchedEffect(Unit) {
+                        PlayerStats.markEventAsDone()
+                        PlayerStats.save(this@DailyEventActivity)
+                    }
+                    DailyEventScreen(event = event, onFinish = { finish() })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AlreadyDoneScreen(onFinish: () -> Unit) {
+    val backgroundColor = Color(0xFF1B5E20)
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = backgroundColor
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFFFFD54F), modifier = Modifier.size(100.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "¡Evento Completado!",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "Ya has participado en la aventura de hoy. Vuelve mañana para nuevos desafíos.",
+                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(40.dp))
+            Button(
+                onClick = onFinish,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F))
+            ) {
+                Text("Regresar", color = Color.Black, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -106,14 +158,12 @@ fun DailyEventScreen(event: StoryEvent, onFinish: () -> Unit) {
                         ChoiceButton(choice) { selectedChoice = choice }
                     }
                 } else {
-                    // Choice selected, now pick a skill and roll
                     ActionPhase(
                         choice = selectedChoice!!,
                         selectedSkill = selectedSkill,
                         onSkillSelect = { selectedSkill = it },
                         onRoll = {
                             isRolling = true
-                            // Simulate roll delay
                         },
                         isRolling = isRolling,
                         onRollComplete = { result ->

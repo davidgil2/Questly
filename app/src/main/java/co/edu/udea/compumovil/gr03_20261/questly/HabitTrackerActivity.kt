@@ -72,6 +72,12 @@ class HabitTrackerActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onResume() {
+        super.onResume()
+        // Recargar stats por si cambió el estado del evento diario
+        PlayerStats.load(this)
+    }
 }
 
 fun sortHabits(habits: MutableList<Habit>) {
@@ -171,6 +177,8 @@ fun HabitTrackerScreen(
         PersistenceManager.saveHabits(context, habits.toList())
     }
 
+    val isEventDone = PlayerStats.isEventDoneToday()
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = backgroundColor,
@@ -178,12 +186,16 @@ fun HabitTrackerScreen(
             Column(horizontalAlignment = Alignment.End) {
                 FloatingActionButton(
                     onClick = onNavigateToEvent,
-                    containerColor = Color(0xFF2E7D32),
+                    containerColor = if (isEventDone) Color.Gray else Color(0xFF2E7D32),
                     contentColor = Color.White,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.border(2.dp, Color.White, RoundedCornerShape(16.dp)).size(64.dp)
                 ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "Daily Event", modifier = Modifier.size(32.dp))
+                    Icon(
+                        imageVector = if (isEventDone) Icons.Default.EventAvailable else Icons.Default.AutoAwesome, 
+                        contentDescription = "Daily Event", 
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))

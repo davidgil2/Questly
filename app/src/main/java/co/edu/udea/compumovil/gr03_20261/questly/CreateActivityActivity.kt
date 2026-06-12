@@ -3,6 +3,7 @@ package co.edu.udea.compumovil.gr03_20261.questly
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,6 +46,7 @@ class CreateActivityActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val isEdit = intent.getBooleanExtra("IS_EDIT", false)
         val editHabitId = intent.getLongExtra("HABIT_ID", -1L)
@@ -306,11 +308,6 @@ fun EditActivityDetailScreen(
     val scope = rememberCoroutineScope()
 
     val isDefaultHabit = habitId == 1L || habitId == 2L || title == "Buenos Días" || title == "Buenas Noches"
-
-    LaunchedEffect(Unit) {
-        delay(300)
-        focusRequester.requestFocus()
-    }
 
     if (showTimePicker) {
         QuestlyTimePicker(
