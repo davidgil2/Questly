@@ -8,11 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,8 +33,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class CreateActivityActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,12 +124,95 @@ class CreateActivityActivity : ComponentActivity() {
     }
 }
 
+fun normalizeTime(time: String): String {
+    val sdf24 = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val sdf12 = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    return try {
+        val t = time.uppercase().trim()
+        val date = if (t.contains("AM") || t.contains("PM")) {
+            sdf12.parse(t)
+        } else {
+            sdf24.parse(t)
+        }
+        sdf24.format(date!!)
+    } catch (e: Exception) {
+        time.uppercase().trim()
+    }
+}
+
+fun parseTime(timeStr: String): Pair<Int, Int> {
+    return try {
+        val t = timeStr.uppercase().trim()
+        val date = if (t.contains("AM") || t.contains("PM")) {
+            SimpleDateFormat("hh:mm a", Locale.getDefault()).parse(t)
+        } else {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).parse(t)
+        }
+        val cal = Calendar.getInstance().apply { time = date!! }
+        cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+    } catch (e: Exception) {
+        7 to 0
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuestlyTimePicker(
+    initialTime: String,
+    onTimeSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val (initialHour, initialMinute) = parseTime(initialTime)
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = false
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Set Time",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.align(Alignment.Start).padding(bottom = 20.dp)
+                )
+                TimePicker(state = timePickerState)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = {
+                        val cal = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                            set(Calendar.MINUTE, timePickerState.minute)
+                        }
+                        onTimeSelected(SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time))
+                        onDismiss()
+                    }) { Text("Confirm") }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Color, ImageVector, String) -> Unit) {
     val backgroundColor = Color(0xFFE8F5E9)
     val focusRequester = remember { FocusRequester() }
+    var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
+        delay(300) 
         focusRequester.requestFocus()
     }
 
@@ -159,14 +249,19 @@ fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Colo
                 }
                 Spacer(Modifier.width(12.dp))
                 TextField(
-                    value = "",
-                    onValueChange = {},
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
                     placeholder = { Text("Search activity...") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
-                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent, 
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color(0xFF4CAF50)
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    singleLine = true
                 )
             }
             
@@ -180,6 +275,7 @@ fun CreateActivityListScreen(onBack: () -> Unit, onSelectActivity: (String, Colo
                 item { CreateHabitRow("Study", "Homework", Color(0xFF81C784), Icons.Default.Book) { onSelectActivity("Study", Color(0xFF81C784), Icons.Default.Book, "Book") } }
                 item { CreateHabitRow("Hydrate!", "Water", Color(0xFF81D4FA), Icons.Default.WaterDrop) { onSelectActivity("Hydrate!", Color(0xFF81D4FA), Icons.Default.WaterDrop, "WaterDrop") } }
                 item { CreateHabitRow("Breakfast", "Meal 1", Color(0xFFFFF176), Icons.Default.Restaurant) { onSelectActivity("Breakfast", Color(0xFFFFF176), Icons.Default.Restaurant, "Restaurant") } }
+                item { CreateHabitRow("Meditation", "Mental Health", Color(0xFFA5D6A7), Icons.Default.SelfImprovement) { onSelectActivity("Meditation", Color(0xFFA5D6A7), Icons.Default.SelfImprovement, "SelfImprovement") } }
             }
         }
     }
@@ -203,13 +299,26 @@ fun EditActivityDetailScreen(
     var questText by remember { mutableStateOf("") }
     val quests = remember { mutableStateListOf<String>().apply { addAll(initialQuests) } }
     var time by remember { mutableStateOf(initialTime) }
+    var showTimePicker by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Identificar si es una tarea por defecto para protegerla de eliminación
     val isDefaultHabit = habitId == 1L || habitId == 2L || title == "Buenos Días" || title == "Buenas Noches"
+
+    LaunchedEffect(Unit) {
+        delay(300)
+        focusRequester.requestFocus()
+    }
+
+    if (showTimePicker) {
+        QuestlyTimePicker(
+            initialTime = time,
+            onTimeSelected = { time = it },
+            onDismiss = { showTimePicker = false }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
@@ -280,11 +389,24 @@ fun EditActivityDetailScreen(
                         onValueChange = { questText = it },
                         placeholder = { Text("Nueva sub-misión...") },
                         modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                        colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent, 
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color(0xFF4CAF50)
+                        ),
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Sentences,
                             imeAction = ImeAction.Done
-                        )
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (questText.isNotBlank()) {
+                                    quests.add(questText)
+                                    questText = ""
+                                }
+                            }
+                        ),
+                        singleLine = true
                     )
                     IconButton(onClick = { if (questText.isNotBlank()) { quests.add(questText); questText = "" } }) {
                         Icon(Icons.Default.AddCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
@@ -295,19 +417,31 @@ fun EditActivityDetailScreen(
             Spacer(Modifier.height(32.dp))
             
             Text("When?", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            TextField(
-                value = time,
-                onValueChange = { time = it },
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color.Black, RoundedCornerShape(12.dp)),
-                colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.Black, RoundedCornerShape(12.dp))
+                    .clickable { showTimePicker = true }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Schedule, null, tint = Color.Gray)
+                    Spacer(Modifier.width(12.dp))
+                    Text(time, fontSize = 18.sp)
+                }
+            }
 
             Spacer(Modifier.height(40.dp))
             
             Button(
                 onClick = { 
-                    if (existingTimes.any { it.equals(time, ignoreCase = true) }) {
+                    val normalizedNew = normalizeTime(time)
+                    val isDuplicate = existingTimes.any { normalizeTime(it) == normalizedNew }
+                    
+                    if (isDuplicate) {
                         scope.launch {
                             snackbarHostState.showSnackbar("Error: Ya tienes una actividad a las $time. ¡Elige otro minuto!")
                         }
@@ -322,7 +456,6 @@ fun EditActivityDetailScreen(
                 Text(if (habitId != -1L) "Update Activity" else "Save Activity", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
             
-            // Solo mostrar botón de eliminar si NO es una tarea por defecto
             if (habitId != -1L && !isDefaultHabit) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(

@@ -213,7 +213,14 @@ fun HabitTrackerScreen(
             ) {
                 Column {
                     Text("Today", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF33691E))
-                    Text("Marzo 24", fontSize = 28.sp, color = Color(0xFF558B2F))
+                    val today = remember {
+                        val cal = java.util.Calendar.getInstance()
+                        val month = cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, java.util.Locale("es"))
+                            ?.replaceFirstChar { it.uppercase() } ?: ""
+                        val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                        "$month $day"
+                    }
+                    Text(today, fontSize = 28.sp, color = Color(0xFF558B2F))
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
@@ -248,14 +255,25 @@ fun HabitTrackerScreen(
             }
             
             Spacer(Modifier.height(24.dp))
-            
-            val days = listOf("L" to "20", "M" to "21", "M" to "22", "J" to "23", "V" to "24", "S" to "25", "D" to "26")
+
+            val days = remember {
+                val cal = java.util.Calendar.getInstance()
+                val todayNum = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                val dayLetters = listOf("D", "L", "M", "M", "J", "V", "S")
+                (-3..3).map { offset ->
+                    val c = java.util.Calendar.getInstance()
+                    c.add(java.util.Calendar.DAY_OF_YEAR, offset)
+                    val letter = dayLetters[c.get(java.util.Calendar.DAY_OF_WEEK) - 1]
+                    letter to c.get(java.util.Calendar.DAY_OF_MONTH).toString()
+                }
+            }
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(days) { (day, date) ->
-                    DayCard(day, date, isSelected = date == "24")
+                    val todayDay = remember { java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH).toString() }
+                    DayCard(day, date, isSelected = date == todayDay)
                 }
             }
             
@@ -267,10 +285,18 @@ fun HabitTrackerScreen(
             ) {
                 items(habits) { habit ->
                     HabitItem(
-                        habit = habit, 
-                        onQuestCompleted = { 
-                            PlayerStats.shopPoints += 10
-                            PlayerStats.save(context)
+                        habit = habit,
+                        onQuestCompleted = {questName ->
+                            val index = habits.indexOfFirst { it.id == habit.id }
+                            if (index != -1) {
+                                val updated = habits[index].copy(
+                                    completedQuests = habits[index].safeCompletedQuests + questName
+                                )
+                                habits[index] = updated
+                                PlayerStats.shopPoints += 10
+                                PlayerStats.save(context)
+                                PersistenceManager.saveHabits(context, habits.toList())
+                            }
                         },
                         onDoubleClick = {
                             val intent = Intent(context, CreateActivityActivity::class.java).apply {
@@ -318,7 +344,7 @@ fun HabitTrackerScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HabitItem(habit: Habit, onQuestCompleted: () -> Unit, onDoubleClick: () -> Unit) {
+fun HabitItem(habit: Habit, onQuestCompleted: (String) -> Unit, onDoubleClick: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f)
     val bgColor = Color(habit.colorValue.toInt())
@@ -365,15 +391,14 @@ fun HabitItem(habit: Habit, onQuestCompleted: () -> Unit, onDoubleClick: () -> U
                 Spacer(Modifier.height(12.dp))
                 Text("Quests (+10 pts cada una):", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = contentColor)
                 habit.quests.forEach { quest ->
-                    var isDone by remember { mutableStateOf(false) }
+                    val isDone = quest in habit.safeCompletedQuests
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(vertical = 4.dp)
                             .clickable { 
                                 if (!isDone) {
-                                    isDone = true
-                                    onQuestCompleted()
+                                    onQuestCompleted(quest)
                                 }
                             }
                     ) {

@@ -6,5 +6,12 @@ data class Habit(
     val time: String,
     val iconName: String,
     val colorValue: Long,
-    val quests: List<String> = emptyList()
-)
+    val quests: List<String> = emptyList(),
+    val completedQuests: Set<String> = emptySet()
+){
+val safeCompletedQuests: Set<String>
+    get() = completedQuests ?: emptySet()
+
+val safeQuests: List<String>
+    get() = quests ?: emptyList()
+}

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,7 +35,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import co.edu.udea.compumovil.gr03_20261.questly.ui.theme.QuestlyTheme
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class OnboardingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,9 +49,7 @@ class OnboardingActivity : ComponentActivity() {
         setContent {
             QuestlyTheme {
                 OnboardingFlow(onFinished = { name, characterClass, wakeTime, sleepTime ->
-                    // Inicializamos las estadísticas del jugador con la clase elegida
                     PlayerStats.initialize(name, characterClass, wakeTime, sleepTime)
-                    // Guardamos los datos iniciales
                     PlayerStats.save(this)
                     PersistenceManager.setOnboardingDone(this, true)
 
@@ -63,8 +67,8 @@ data class CharacterOption(val name: String, val icon: ImageVector, val descript
 @Composable
 fun OnboardingFlow(onFinished: (String, String, String, String) -> Unit) {
     var step by remember { mutableStateOf(1) }
-    var wakeTime by remember { mutableStateOf("05:00") }
-    var sleepTime by remember { mutableStateOf("22:00") }
+    var wakeTime by remember { mutableStateOf("07:00 AM") }
+    var sleepTime by remember { mutableStateOf("10:00 PM") }
     var selectedSex by remember { mutableStateOf("") }
     var userName by remember { mutableStateOf("") }
     var selectedClass by remember { mutableStateOf<CharacterOption?>(null) }
@@ -104,17 +108,17 @@ fun OnboardingFlow(onFinished: (String, String, String, String) -> Unit) {
                     )
                     3 -> NameSetupScreen(
                         name = userName,
-                        onNameChange = { userName = it }
+                        onNameChange = { userName = it },
+                        onNext = { if (userName.isNotBlank()) step++ }
                     )
                     4 -> ClassSelectionScreen(
                         selectedClass = selectedClass,
                         onClassSelected = { selectedClass = it }
                     )
                 }
-                Spacer(Modifier.height(140.dp)) // Espacio para el botón flotante
+                Spacer(Modifier.height(140.dp))
             }
 
-            // Next Button
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -144,8 +148,12 @@ fun OnboardingFlow(onFinished: (String, String, String, String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeSetupScreen(wakeTime: String, sleepTime: String, onWakeChange: (String) -> Unit, onSleepChange: (String) -> Unit) {
+    var showWakePicker by remember { mutableStateOf(false) }
+    var showSleepPicker by remember { mutableStateOf(false) }
+
     Text(
         text = "What time do you wake up and go to sleep?",
         fontSize = 28.sp,
@@ -156,17 +164,28 @@ fun TimeSetupScreen(wakeTime: String, sleepTime: String, onWakeChange: (String) 
 
     Spacer(modifier = Modifier.height(60.dp))
     
-    val wakeFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        wakeFocusRequester.requestFocus()
+    if (showWakePicker) {
+        OnboardingTimePicker(
+            initialTime = wakeTime,
+            onTimeSelected = onWakeChange,
+            onDismiss = { showWakePicker = false }
+        )
+    }
+
+    if (showSleepPicker) {
+        OnboardingTimePicker(
+            initialTime = sleepTime,
+            onTimeSelected = onSleepChange,
+            onDismiss = { showSleepPicker = false }
+        )
     }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        TimeItem("Good Morning", wakeTime, Icons.Default.WbCloudy, onWakeChange, wakeFocusRequester)
-        TimeItem("Good Night", sleepTime, Icons.Default.NightsStay, onSleepChange)
+        TimeItem("Good Morning", wakeTime, Icons.Default.WbCloudy) { showWakePicker = true }
+        TimeItem("Good Night", sleepTime, Icons.Default.NightsStay) { showSleepPicker = true }
     }
 
     Spacer(modifier = Modifier.height(60.dp))
@@ -180,29 +199,59 @@ fun TimeSetupScreen(wakeTime: String, sleepTime: String, onWakeChange: (String) 
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimeItem(label: String, time: String, icon: ImageVector, onTimeChange: (String) -> Unit, focusRequester: FocusRequester? = null) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun OnboardingTimePicker(initialTime: String, onTimeSelected: (String) -> Unit, onDismiss: () -> Unit) {
+    val sdf12 = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    val sdf24 = SimpleDateFormat("HH:mm", Locale.getDefault())
+    
+    val date = try {
+        if (initialTime.contains("AM") || initialTime.contains("PM")) sdf12.parse(initialTime)
+        else sdf24.parse(initialTime)
+    } catch (e: Exception) { null }
+
+    val cal = Calendar.getInstance().apply { if (date != null) time = date }
+    val state = rememberTimePickerState(
+        initialHour = cal.get(Calendar.HOUR_OF_DAY),
+        initialMinute = cal.get(Calendar.MINUTE),
+        is24Hour = false
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = Color.White) {
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Select Time", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 20.dp))
+                TimePicker(state = state)
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = {
+                        val resultCal = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, state.hour)
+                            set(Calendar.MINUTE, state.minute)
+                        }
+                        onTimeSelected(sdf12.format(resultCal.time))
+                        onDismiss()
+                    }) { Text("Confirm") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimeItem(label: String, time: String, icon: ImageVector, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color.White, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(16.dp)
+    ) {
         Icon(icon, null, modifier = Modifier.size(48.dp), tint = Color(0xFFFFD54F))
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        TextField(
-            value = time,
-            onValueChange = onTimeChange,
-            modifier = Modifier
-                .width(100.dp)
-                .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
-                .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontSize = 16.sp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-        )
+        Text(time, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
     }
 }
 
@@ -252,7 +301,7 @@ fun SexCard(label: String, icon: ImageVector, isSelected: Boolean, modifier: Mod
 }
 
 @Composable
-fun NameSetupScreen(name: String, onNameChange: (String) -> Unit) {
+fun NameSetupScreen(name: String, onNameChange: (String) -> Unit, onNext: () -> Unit) {
     Text(
         text = "What's your\nname?",
         fontSize = 36.sp,
@@ -265,6 +314,7 @@ fun NameSetupScreen(name: String, onNameChange: (String) -> Unit) {
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        delay(300)
         focusRequester.requestFocus()
     }
 
@@ -284,8 +334,12 @@ fun NameSetupScreen(name: String, onNameChange: (String) -> Unit) {
         ),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Words,
-            imeAction = ImeAction.Done
-        )
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onNext = { onNext() }
+        ),
+        singleLine = true
     )
 }
 
@@ -308,7 +362,7 @@ fun ClassSelectionScreen(selectedClass: CharacterOption?, onClassSelected: (Char
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp) // Limitar altura para permitir scroll en el padre
+        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
     ) {
         items(options) { option ->
             val isSelected = selectedClass?.name == option.name
