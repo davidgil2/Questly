@@ -123,6 +123,19 @@ fun HabitTrackerScreen(
         }
     }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted -> }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        habits.forEach { HabitNotificationManager.scheduleNotification(context, it) }
+    }
+
     val createActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -299,7 +312,7 @@ fun HabitTrackerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(habits) { habit ->
+                items(habits, key = { it.id }) { habit ->
                     HabitItem(
                         habit = habit,
                         onQuestCompleted = {questName ->

@@ -13,6 +13,7 @@ class HabitAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val habitTitle = intent.getStringExtra("HABIT_TITLE") ?: "Activity Reminder"
         val habitId = intent.getLongExtra("HABIT_ID", 0L)
+        val habitTime = intent.getStringExtra("HABIT_TIME")
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "questly_habit_channel"
@@ -39,14 +40,20 @@ class HabitAlarmReceiver : BroadcastReceiver() {
         )
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Fallback icon
-            .setContentTitle("Questly: Time for action!")
-            .setContentText("Your activity '$habitTitle' is ready to start.")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Questly: ¡Es hora de la acción!")
+            .setContentText("Tu actividad '$habitTitle' está lista para comenzar.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(habitId.toInt(), notification)
+        notificationManager.notify(habitId.hashCode(), notification)
+
+        // Re-programar para el día siguiente
+        if (habitTime != null) {
+            val habit = Habit(id = habitId, title = habitTitle, time = habitTime, iconName = "", colorValue = 0)
+            HabitNotificationManager.scheduleNotification(context, habit)
+        }
     }
 }
