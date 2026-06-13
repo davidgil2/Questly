@@ -87,11 +87,12 @@ fun sortHabits(habits: MutableList<Habit>) {
     habits.sortBy { habit ->
         try {
             val timeStr = habit.time.uppercase()
-            if (timeStr.contains("AM") || timeStr.contains("PM")) {
-                sdf12.parse(timeStr)?.time ?: 0L
+            val date = if (timeStr.contains("AM") || timeStr.contains("PM")) {
+                sdf12.parse(timeStr)
             } else {
-                sdf24.parse(timeStr)?.time ?: 0L
+                sdf24.parse(timeStr)
             }
+            date?.time ?: 0L
         } catch (e: Exception) {
             0L
         }
@@ -144,21 +145,22 @@ fun HabitTrackerScreen(
             val iconName = data?.getStringExtra("HABIT_ICON_NAME") ?: "Add"
             val quests = data?.getStringArrayListExtra("HABIT_QUESTS") ?: arrayListOf<String>()
 
-            if (id != -1L) {
-                val index = habits.indexOfFirst { it.id == id }
-                if (index != -1) {
-                    val updatedHabit = habits[index].copy(
-                        title = title,
-                        time = time,
-                        colorValue = colorLong,
-                        iconName = iconName,
-                        quests = quests
-                    )
-                    habits[index] = updatedHabit
-                    HabitNotificationManager.scheduleNotification(context, updatedHabit)
-                }
+            val index = habits.indexOfFirst { it.id == id }
+            if (index != -1) {
+                // Actualizar hábito existente
+                val updatedHabit = habits[index].copy(
+                    title = title,
+                    time = time,
+                    colorValue = colorLong,
+                    iconName = iconName,
+                    quests = quests
+                )
+                habits[index] = updatedHabit
+                HabitNotificationManager.scheduleNotification(context, updatedHabit)
             } else {
+                // Crear nuevo hábito
                 val newHabit = Habit(
+                    id = if (id != -1L) id else System.currentTimeMillis(),
                     title = title,
                     time = time,
                     iconName = iconName,
@@ -168,11 +170,13 @@ fun HabitTrackerScreen(
                 habits.add(newHabit)
                 HabitNotificationManager.scheduleNotification(context, newHabit)
             }
+            
             sortHabits(habits)
             PersistenceManager.saveHabits(context, habits.toList())
         }
     }
 
+    // Asegurar que los hábitos se guarden si la lista cambia por otros medios
     LaunchedEffect(habits.size) {
         PersistenceManager.saveHabits(context, habits.toList())
     }
